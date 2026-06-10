@@ -72,44 +72,6 @@ function AuthScreen() {
       </div>
     </div>
   );
-};
-
-  if (sent) return (
-    <div className="auth-screen">
-      <div className="card join">
-        <div className="join-eyebrow">Revisá tu casilla</div>
-        <h2>¡Te mandamos el link!</h2>
-        <p className="muted" style={{ marginTop: 10, lineHeight: 1.6 }}>
-          Abrí el email que te llegó de Supabase y hacé clic en
-          <strong> "Confirm your signup"</strong>. Después volvé a esta página.
-        </p>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="auth-screen">
-      <div className="card join">
-        <div className="join-eyebrow">PRODE Mundial 2026</div>
-        <h2>Ingresá con tu email</h2>
-        <p className="muted" style={{ marginTop: 6, lineHeight: 1.5 }}>
-          Te mandamos un <strong>link mágico</strong> al instante. Sin contraseña.
-        </p>
-        {err && <p className="err">{err}</p>}
-        <div className="join-row">
-          <input
-            type="email" value={email} placeholder="tu@email.com"
-            onChange={e => setEmail(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-          />
-          <button className="btn-gold" disabled={loading || !email.trim()} onClick={handleSubmit}>
-            {loading ? '…' : 'Entrar'}
-          </button>
-        </div>
-        <p className="hint">La primera vez te va a pedir que elijas un nombre para el PRODE.</p>
-      </div>
-    </div>
-  );
 }
 
 // =====================================================================
