@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { supabase } from './lib/supabase';
 import {
-  signInWithEmail, signOut, onAuthChange,
+  signUpWithPassword, signInWithPassword, signOut, onAuthChange,
   getProfile, createProfile,
   getRoster, getPredictions, savePredictions, getAllPredictions,
   getResults, saveResult, deleteResult,
@@ -20,18 +20,59 @@ import {
 
 function AuthScreen() {
   const [email, setEmail] = useState('');
-  const [sent, setSent] = useState(false);
+  const [password, setPassword] = useState('');
+  const [isNew, setIsNew] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState('');
 
-  const handleSubmit = async () => {
-    if (!email.includes('@')) { setErr('Ingresá un email válido.'); return; }
+  const handle = async () => {
+    if (!email.includes('@') || password.length < 6) {
+      setErr('Email válido y contraseña de al menos 6 caracteres.'); return;
+    }
     setLoading(true); setErr('');
-    const { error } = await signInWithEmail(email);
-    if (error) setErr(error.message);
-    else setSent(true);
+    if (isNew) {
+      const { error } = await signUpWithPassword(email, password);
+      if (error) setErr(error.message);
+    } else {
+      const { error } = await signInWithPassword(email, password);
+      if (error?.message?.includes('Invalid login')) {
+        setErr('Email o contraseña incorrectos.');
+      } else if (error) setErr(error.message);
+    }
     setLoading(false);
   };
+
+  return (
+    <div className="auth-screen">
+      <div className="card join">
+        <div className="join-eyebrow">PRODE Mundial 2026</div>
+        <h2>{isNew ? 'Crear cuenta' : 'Ingresar'}</h2>
+        <p className="muted" style={{marginTop:6}}>
+          {isNew ? 'Elegí una contraseña para tu cuenta.' : 'Ingresá con tu email y contraseña.'}
+        </p>
+        {err && <p className="err">{err}</p>}
+        <div style={{display:'flex',flexDirection:'column',gap:10,marginTop:14}}>
+          <input type="email" value={email} placeholder="tu@email.com"
+            onChange={e => setEmail(e.target.value)} />
+          <input type="password" value={password} placeholder="Contraseña (mín. 6 caracteres)"
+            onChange={e => setPassword(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handle()} />
+        </div>
+        <div className="join-row" style={{marginTop:10}}>
+          <button className="btn-gold" style={{flex:1}} disabled={loading} onClick={handle}>
+            {loading ? '…' : (isNew ? 'Crear cuenta' : 'Entrar')}
+          </button>
+        </div>
+        <p className="hint" style={{textAlign:'center',marginTop:12}}>
+          {isNew ? '¿Ya tenés cuenta?' : '¿Primera vez?'}{' '}
+          <button className="btn-link" onClick={() => { setIsNew(o => !o); setErr(''); }}>
+            {isNew ? 'Iniciá sesión' : 'Creá una cuenta'}
+          </button>
+        </p>
+      </div>
+    </div>
+  );
+};
 
   if (sent) return (
     <div className="auth-screen">
