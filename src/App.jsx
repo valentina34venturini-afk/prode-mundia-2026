@@ -11,7 +11,7 @@ import {
 import {
   GROUP_MATCHES, GROUPS, FLAGS, flag, computePoints,
   DOW, MON, fmtKO, isLocked,
-  dateKeyOf, buildDates, dateLabel, etToday, defaultDate,
+  dateKeyOf, buildDates, dateLabel, etToday, defaultDate, isBeforeWindow,
 } from './data';
 
 // =====================================================================
@@ -155,11 +155,12 @@ function Selector({ mode, dates, dsel, setDsel, gsel, setGsel, hasExtra, activeR
         );
         const ms = allMatches.filter(m => dateKeyOf(m.ko) === d);
         const done = ms.length > 0 && ms.every(m => results[m.id]);
+        const allLocked = ms.length > 0 && ms.every(m => isBeforeWindow(m.ko));
         const isToday = d === today;
         const [y, mo, da] = d.split('-');
         return (
           <button key={d} ref={dsel === d ? activeRef : null}
-            className={'dtab' + (dsel === d ? ' on' : '') + (done ? ' done' : '') + (isToday ? ' today' : '')}
+            className={'dtab' + (dsel === d ? ' on' : '') + (done ? ' done' : '') + (isToday ? ' today' : '') + (allLocked && !isToday ? ' locked-future' : '')}
             onClick={() => setDsel(d)}>
             <span className="dt-dow">{DOW[new Date(+y, +mo - 1, +da).getDay()]}</span>
             <span className="dt-day">{+da}</span>
@@ -247,6 +248,7 @@ function Predictions({ me, allMatches, results }) {
           const p = preds[m.id] || {};
           const res = results[m.id];
           const locked = isLocked(m.ko) || !!res;
+          const notYetOpen = isBeforeWindow(m.ko);
           const pts = res ? computePoints(p, res) : null;
           return (
             <div className={'match' + (locked ? ' locked' : '')} key={m.id}>
@@ -258,11 +260,11 @@ function Predictions({ me, allMatches, results }) {
                 <div className="team t-l"><span className="fl">{flag(m.t1)}</span><span className="tn">{m.t1}</span></div>
                 <div className="score">
                   <input type="number" inputMode="numeric" min="0" max="20"
-                    value={p.h ?? ''} disabled={locked}
+                    value={p.h ?? ''} disabled={locked || notYetOpen}
                     onChange={e => setScore(m.id, 'h', e.target.value)} />
                   <span className="dash">–</span>
                   <input type="number" inputMode="numeric" min="0" max="20"
-                    value={p.a ?? ''} disabled={locked}
+                    value={p.a ?? ''} disabled={locked || notYetOpen}
                     onChange={e => setScore(m.id, 'a', e.target.value)} />
                 </div>
                 <div className="team t-r"><span className="tn">{m.t2}</span><span className="fl">{flag(m.t2)}</span></div>
@@ -272,6 +274,8 @@ function Predictions({ me, allMatches, results }) {
                   <><span className="final">Final {res.h}–{res.a}</span>{pts !== null && <span className={'stamp s' + pts}>+{pts}</span>}</>
                 ) : locked ? (
                   <span className="closed">Cerrado · esperando resultado</span>
+                ) : notYetOpen ? (
+                  <span className="closed">🔒 Abre 24h antes del partido</span>
                 ) : (
                   <span className="open">Abierto para pronosticar</span>
                 )}
@@ -298,6 +302,29 @@ function Predictions({ me, allMatches, results }) {
 function Standings({ me, results, allMatches, reload }) {
   const [rows, setRows] = useState(null);
   const [busy, setBusy] = useState(false);
+
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState('');
+
+  const syncResults = async () => {
+    setSyncing(true); setSyncMsg('');
+    try {
+      const res = await fetch('/api/sync-results', {
+        headers: process.env.SYNC_SECRET ? { 'x-sync-secret': process.env.SYNC_SECRET } : {},
+      });
+      const data = await res.json();
+      if (data.synced !== undefined) {
+        setSyncMsg(`✓ ${data.synced} resultado(s) sincronizados`);
+        await reload();
+      } else {
+        setSyncMsg('Error: ' + (data.error || 'desconocido'));
+      }
+    } catch (e) {
+      setSyncMsg('Error de red');
+    }
+    setSyncing(false);
+    setTimeout(() => setSyncMsg(''), 4000);
+  };
 
   const compute = useCallback(async () => {
     setBusy(true);
@@ -335,10 +362,16 @@ function Standings({ me, results, allMatches, reload }) {
     <>
       <div className="tabla-top">
         <h2>Tabla de posiciones</h2>
-        <button className="btn-ghost" disabled={busy} onClick={async () => { await reload(); compute(); }}>
-          {busy ? 'Actualizando…' : 'Actualizar'}
-        </button>
+        <div style={{display:'flex',gap:8}}>
+          <button className="btn-ghost" disabled={syncing} onClick={syncResults}>
+            {syncing ? 'Sincronizando…' : '🔄 Sync resultados'}
+          </button>
+          <button className="btn-ghost" disabled={busy} onClick={async () => { await reload(); compute(); }}>
+            {busy ? '…' : 'Actualizar'}
+          </button>
+        </div>
       </div>
+      {syncMsg && <div className="toast" style={{position:'relative',left:'auto',transform:'none',marginBottom:12}}>{syncMsg}</div>}
 
       {!playedAny && (
         <div className="card empty" style={{ marginBottom: 12 }}>
